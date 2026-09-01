@@ -1,8 +1,49 @@
 import base64
 import os
+from typing import Union
+
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+
+class Salt:
+    """Güvenli ve kullanılabilir salt değeri taşıyan yardımcı sınıf."""
+
+    def __init__(self, value: Union[bytes, str, None] = None, length: int = 16):
+        if value is None:
+            self._value = os.urandom(length)
+        elif isinstance(value, str):
+            self._value = value.encode('utf-8')
+        elif isinstance(value, (bytes, bytearray)):
+            self._value = bytes(value)
+        else:
+            raise TypeError('Salt değeri bytes, str veya None olmalıdır.')
+
+    @classmethod
+    def generate(cls, length: int = 16) -> 'Salt':
+        """Yeni rastgele bir salt üretir."""
+        return cls(length=length)
+
+    @classmethod
+    def from_value(cls, value: Union[bytes, str, None]) -> 'Salt':
+        """Mevcut salt değerinden nesne oluşturur."""
+        return cls(value=value)
+
+    def to_bytes(self) -> bytes:
+        """Salt değerini bayt dizisine çevirir."""
+        return self._value
+
+    def to_string(self) -> str:
+        """Salt değerini metin olarak döndürür."""
+        return self._value.decode('utf-8', errors='strict')
+
+    def __bytes__(self) -> bytes:
+        return self._value
+
+    def __str__(self) -> str:
+        return self.to_string()
+
 
 class CryptoManager:
     """
@@ -11,12 +52,16 @@ class CryptoManager:
     """
     def __init__(self, master_password: str, salt: bytes = None):
         self.master_password = master_password.encode('utf-8')
-        
-        # Salt yoksa yeni bir 16 baytlık rastgele salt üretilir
+
+        # Salt kontrolü ve tip doğrulaması
         if salt is None:
-            self.salt = os.urandom(16)
+            self.salt = Salt.generate().to_bytes()
+        elif isinstance(salt, Salt):
+            self.salt = salt.to_bytes()
+        elif isinstance(salt, str):
+            self.salt = Salt.from_value(salt).to_bytes()
         else:
-            self.salt = salt
+            self.salt = bytes(salt)
 
         self.key = self._generate_key()
         self.fernet = Fernet(self.key)

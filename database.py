@@ -1,6 +1,5 @@
 import sqlite3
 import hashlib
-import os
 
 DB_NAME = "vault.db"
 
@@ -53,6 +52,9 @@ class DatabaseManager:
 
     def setup_master_password(self, master_password: str, salt: bytes):
         """İlk kurulumda Master Password hash'ini ve salt değerini kaydeder."""
+        if isinstance(salt, str):
+            salt = salt.encode('utf-8')
+            
         master_hash = hashlib.sha256(master_password.encode('utf-8') + salt).hexdigest()
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -72,6 +74,11 @@ class DatabaseManager:
                 return False, None
             
             stored_hash, salt = row
+
+            # SQLite 'BLOB' verisi string olarak dönerse bytes'a dönüştürülür
+            if isinstance(salt, str):
+                salt = salt.encode('utf-8')
+            
             input_hash = hashlib.sha256(master_password.encode('utf-8') + salt).hexdigest()
             
             if input_hash == stored_hash:
